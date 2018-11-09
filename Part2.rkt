@@ -1,6 +1,6 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-beginner-reader.ss" "lang")((modname Part2) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #f #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp")) #f)))
+#reader(lib "htdp-beginner-abbr-reader.ss" "lang")((modname Part2) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #f #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp")) #f)))
 ;e129.
 
 ;e130.
@@ -375,4 +375,367 @@
 ;e159.
 
 ;e160.
+
+;e161.
+; List-of-numbers -> List-of-numbers
+; computes the weekly wages for all given weekly hours
+(define (wage* whrs)
+  (cond
+    [(empty? whrs) '()]
+    [else (cons (wage (first whrs)) (wage* (rest whrs)))]))
+
+(define PAYMENT-PER-HOUR 12)
+; Number -> Number
+; computes the wage for h hours of work
+(define (wage h)
+  (* PAYMENT-PER-HOUR h))
+
+(check-expect (wage* (cons 4 (cons 8 (cons 20 '()))))
+              (cons 48 (cons 96 (cons 240 '()))))
+
+;e162.
+; check if working hours is valid
+; Number -> Boolean
+(define (whrs-protect hrs)
+  (if (> hrs 100) #f
+      #t))
+
+;e163.
+; List-of-fahrenheit -> List-of-celsius
+(define (convertFC lof)
+  '())
+
+; Number -> Number
+(define (f2c f)
+  0)
+
+;e164.
+; List-of-euros -> List-of-usds
+(define (convert-euro loe)
+  '())
+
+; Number -> Number
+(define (euro-usd euro rate)
+  (* euro rate))
+
+(define (conver-euro* loe rate)
+  '())
+
+;e165.
+;List-of-strings -> List-of-strings
+(define (subst-robot los)
+  (cond [(empty? los) '()]
+        [(cons? los) (cons (robot-r2d2 (first los)) (subst-robot (rest los)))]))
+
+;String -> String
+(define (robot-r2d2 str)
+  (if (string=? str "robot") "r2d2" str))
+
+;String String String -> String
+(define (replace str old new)
+  (if (string=? str old) new str))
+
+;List-of-strings String String -> List-of-strings
+(define (substitute los old new)
+  (cond [(empty? los) '()]
+        [(cons? los) (cons (replace (first los) old new)
+                           (substitute (rest los) old new))]))
+
+;e166.
+; Paycheck structure
+(define-struct paycheck [name amount])
+; A paycheck contains the employee's name and wage amount.
+; (make-paycheck name wage) to create a paycheck.
+
+;e167.
+
+;e168.
+
+;e169.
+
+;e170.
+
+;e171.
+;A List-of-strings is one of below
+; - '()
+; - (cons String List-of-strings)
+
+;A List-of-list-of-strings is one of below
+; - '()
+; - (cons List-of-strings List-of-list-of-strings)
+
+;e172.
+; Los -> String
+(define (collapse-ln los)
+  (cond [(empty? los) ""]
+        [(cons? los) (string-append (first los)
+                                    " "
+                                    (collapse-ln (rest los)))]))
+
+; LLS -> String
+(define (collapse lls)
+  (cond [(empty? lls) ""]
+        [(cons? lls) (string-append (collapse-ln (first lls))
+                                    "\n"
+                                    (collapse (rest lls)))]))
+;(write-file "ttt.dat" (collapse (read-words/line "ttt.txt")))
+
+;e173.
+; Los -> Los
+(define (no-articles ln)
+  (cond [(empty? ln) ln]
+        [(cons? ln) (if (or (string=? (first ln) "a")
+                            (string=? (first ln) "an")
+                            (string=? (first ln) "the"))
+                        (cons (no-articles (rest ln)))
+                        (cons (first ln) (no-articles (rest ln))))]))
+
+;e174.
+; 1String -> String
+; converts the given 1String to a 3-letter numeric String
+ 
+(check-expect (encode-letter "z") (code1 "z"))
+(check-expect (encode-letter "\t")
+              (string-append "00" (code1 "\t")))
+(check-expect (encode-letter "a")
+              (string-append "0" (code1 "a")))
+ 
+(define (encode-letter s)
+  (cond
+    [(>= (string->int s) 100) (code1 s)]
+    [(< (string->int s) 10)
+     (string-append "00" (code1 s))]
+    [(< (string->int s) 100)
+     (string-append "0" (code1 s))]))
+ 
+; 1String -> String
+; converts the given 1String into a String
+ 
+(check-expect (code1 "z") "122")
+ 
+(define (code1 c)
+  (number->string (string->int c)))
+
+;encode a word into a number string
+;List-of-letters -> String
+(check-expect (encode-word (explode "z a")) "122032097")
+(define (encode-word lol)
+  (cond [(empty? lol) ""]
+        [else (string-append (encode-letter (first lol))
+                             (encode-word (rest lol)))]))
+
+;encode a list of string into a numeric string
+;Los -> String
+(define (encode-ln ln)
+  (cond [(empty? ln) ""]
+        [(cons? ln) (string-append (encode-word (explode (first ln)))
+                                   (encode-ln (rest ln)))]))
+
+;encode LLS into a numeric string.
+;LLS -> String
+(define (encode-lls lls)
+  (cond [(empty? lls) ""]
+        [(cons? lls) (string-append (encode-ln (first lls))
+                                    (encode-lls (rest lls)))]))
+
+;String -> String
+(define (encode-file file)
+  (encode-lls (read-words/line file)))
+
+(check-expect (encode-file "ttt.txt")
+              "084084084080117116117112105110097112108097099101119104101114101105116039115101097115121116111115101101116104101099114121112116105099097100109111110105115104109101110116084046084046084046087104101110121111117102101101108104111119100101112114101115115105110103108121115108111119108121121111117099108105109098044105116039115119101108108116111114101109101109098101114116104097116084104105110103115084097107101084105109101046080105101116072101105110")
+
+;e175.
+
+;e176.
+(define row1 (cons 11 (cons 12 '())))
+(define row2 (cons 21 (cons 22 '())))
+(define mat1 (cons row1 (cons row2 '())))
+
+; Matrix -> Matrix
+; transposes the given matrix along the diagonal 
+ 
+(define wor1 (cons 11 (cons 21 '())))
+(define wor2 (cons 12 (cons 22 '())))
+(define tam1 (cons wor1 (cons wor2 '())))
+
+;non-recursive operation, cannot be implemented
+
+;e177.-e180.
+
+;e181.-e185.
+
+;e186.
+; List-of-numbers -> List-of-numbers
+; produces a sorted version of l
+(define (sort> l)
+  (cond
+    [(empty? l) '()]
+    [(cons? l) (insert (first l) (sort> (rest l)))]))
+ 
+; Number List-of-numbers -> List-of-numbers
+; inserts n into the sorted list of numbers l 
+(define (insert n l)
+  (cond
+    [(empty? l) (cons n '())]
+    [else (if (>= n (first l))
+              (cons n l)
+              (cons (first l) (insert n (rest l))))]))
+
+(check-satisfied (sort> (list 9 8 17 6 15 4 3 12 1 10)) sorted>?)
+
+; List-of-numbers -> List-of-numbers
+; produces a sorted version of l
+(define (sort>/bad l)
+  (list 9 8 7 6 5 4 3 2 1 0))
+
+(check-satisfied (sort>/bad (list 9 8 17 6 15 4 3 12 1 10)) sorted>?)
+;(check-expect (sum (sort>/bad (list 9 8 17 6 15 4 3 12 1 10)))
+;              (sum (list 9 8 17 6 15 4 3 12 1 10)))
+
+;e187.
+(define-struct gp [name score])
+; A GamePlayer is a structure: 
+;    (make-gp String Number)
+; interpretation (make-gp p s) represents player p who 
+; scored a maximum of s points
+
+; List-of-gp -> List-of-gp
+; sort list of gp
+(define (sort-gp l)
+  (cond [(empty? l) '()]
+        [(cons? l) (insert-gp (first l) (sort-gp (rest l)))]))
+
+; GP List-of-gp -> List-of-gp
+(define (insert-gp gp l)
+  (cond [(empty? l) (list gp)]
+        [(cons? l) (if (compare-gp gp (first l))
+                       (cons gp l)
+                       (cons (first l) (insert-gp gp (rest l))))]))
+
+; GP GP -> Boolean
+(define (compare-gp gp1 gp2)
+  (if (> (gp-score gp1) (gp-score gp2)) #t #f))
+(check-expect (compare-gp (make-gp "B" 22) (make-gp "C" 123)) #f)
+
+(make-gp "A" 12)
+(make-gp "B" 22)
+(make-gp "C" 123)
+
+(check-expect (sort-gp (list (make-gp "B" 22)
+                             (make-gp "A" 12)
+                             (make-gp "C" 123)))
+              (list (make-gp "C" 123)
+                    (make-gp "B" 22)
+                    (make-gp "A" 12)))
+
+;e188.
+
+;e189.
+; alon is sorted descended
+(define (search-sorted n alon)
+  (cond [(empty? alon) #f]
+        [(cons? alon) (cond [(= n (first alon)) #t]
+                            [(> n (first alon)) #f]
+                            [else (search-sorted n (rest alon))])]))
+;(search-sorted 5.5 (list 9 8 7 6 5 4 3 2 1 0))
+
+;e190.
+
+;e191.
+; a plain background image 
+(define MT (empty-scene 50 50))
+(define square-p
+  (list
+   (make-posn 10 10)
+   (make-posn 20 10)
+   (make-posn 20 20)
+   (make-posn 10 20)))
+
+(check-expect
+ (render-polygon MT square-p)
+ (scene+line
+  (scene+line
+   (scene+line
+    (scene+line MT 10 10 20 10 "red")
+    20 10 20 20 "red")
+   20 20 10 20 "red")
+  10 20 10 10 "red"))
+
+(define (render-line BG p1 p2)
+  (scene+line BG (posn-x p1) (posn-y p1) (posn-x p2) (posn-y p2) "red"))
+
+(define (connect-dots img p)
+  (cond
+    [(empty? (rest p)) img]
+    [else
+     (render-line
+      (connect-dots img (rest p))
+      (first p)
+      (second p))]))
+
+; Image Polygon -> Image 
+; adds an image of p to img
+(define (render-polygon img p)
+  (render-line (connect-dots img p)
+               (first p)
+               (last p)))
+
+(define (last p)
+  (cond
+    [(empty? (rest p)) (first p)]
+    [else (last (rest p))]))
+
+;e192.
+;they share the same list definition
+
+;e193.
+(define (render-poly-f img p)
+  (connect-dots img (cons (last p) p)))
+(check-expect
+ (render-poly-f MT square-p)
+ (scene+line
+  (scene+line
+   (scene+line
+    (scene+line MT 10 10 20 10 "red")
+    20 10 20 20 "red")
+   20 20 10 20 "red")
+  10 20 10 10 "red"))
+
+(define (render-poly-l img p)
+  (connect-dots img (add-to-end (first p) p)))
+(define (add-to-end item l)
+  (cond [(empty? l) (list item)]
+        [(cons? l) (cons (first l) (add-to-end item (rest l)))]))
+(check-expect
+ (render-poly-l MT square-p)
+ (scene+line
+  (scene+line
+   (scene+line
+    (scene+line MT 10 10 20 10 "red")
+    20 10 20 20 "red")
+   20 20 10 20 "red")
+  10 20 10 10 "red"))
+
+;e194.
+(define (connect-dots+ img p posn)
+  (cond
+    [(empty? (rest p)) (render-line img (first p) posn)]
+    [else
+     (render-line
+      (connect-dots+ img (rest p) posn)
+      (first p)
+      (second p))]))
+
+(define (render-poly+ img p)
+  (connect-dots+ img p (first p)))
+(check-expect
+ (render-poly+ MT square-p)
+ (scene+line
+  (scene+line
+   (scene+line
+    (scene+line MT 10 10 20 10 "red")
+    20 10 20 20 "red")
+   20 20 10 20 "red")
+  10 20 10 10 "red"))
 
