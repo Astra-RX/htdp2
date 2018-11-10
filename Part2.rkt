@@ -739,3 +739,473 @@
    20 20 10 20 "red")
   10 20 10 10 "red"))
 
+;e195.-e208.
+
+;e209.
+; A Word is one of:
+; – '() or
+; – (cons 1String Word)
+; interpretation a Word is a list of 1Strings (letters)
+
+; String -> Word
+; converts s to the chosen word representation 
+(define (string->word s)
+  (explode s))
+ 
+; Word -> String
+; converts w to a string
+(define (word->string w)
+  (implode w))
+
+;e210.
+; List-of-words -> List-of-strings
+; convert words to los
+(define (words->strings low)
+  (cond [(empty? low) '()]
+        [(cons? low) (cons (word->string (first low))
+                           (words->strings (rest low)))]))
+(check-expect (words->strings (list (list "c" "a" "t")
+                                    (list "a" "c" "t")
+                                    (list "r" "a" "t")))
+              (list "cat" "act" "rat"))
+
+;e211.
+(define LOCATION "words.txt")
+(define DICT (read-lines LOCATION))
+
+; search the word in the dictionary
+; String -> Boolean
+(define (search-dict w los)
+  (cond [(empty? los) #f]
+        [(cons? los) (if (string=? (string-downcase (first los)) w)
+                         #t
+                         (search-dict w (rest los)))]))
+(check-expect (search-dict "word" DICT) #t)
+(check-expect (search-dict "wordfasef" DICT) #f)
+
+; filter out the word in the dictionary from the list
+; List-of-string -> Los
+(define (in-dictionary los)
+  (cond [(empty? los) '()]
+        [(cons? los) (if (search-dict (first los) DICT)
+                         (cons (first los) (in-dictionary (rest los)))
+                         (in-dictionary (rest los)))]))
+(check-expect (in-dictionary (list "act" "cat" "bffasdfbb"))
+              (list "act" "cat"))
+
+;e212.
+; A List-of-words is one of:
+; - '()
+; - (cons Word List-of-words)
+
+;e213.
+(define (arrangements w)
+  (cond
+    [(empty? w) (list '())]
+    [else (insert-everywhere/in-all-words (first w)
+                                          (arrangements (rest w)))]))
+(check-expect (arrangements (list "c" "a" "t"))
+              (list
+               (list "c" "a" "t")
+               (list "a" "c" "t")
+               (list "a" "t" "c")
+               (list "c" "t" "a")
+               (list "t" "c" "a")
+               (list "t" "a" "c")))
+
+; Insert a letter in a list-of-word everywhere
+; 1String List-of-words -> List-of-words
+(define (insert-everywhere/in-all-words letter low)
+  (cond [(empty? low) '()]
+        [(cons? low) (append (insert-everywhere letter (first low))
+                             (insert-everywhere/in-all-words letter (rest low)))]))
+(check-expect (insert-everywhere/in-all-words "b" (list (list "c" "a" "t")
+                                                        (list "a" "c" "t")))
+              (list
+               (list "b" "c" "a" "t")
+               (list "c" "b" "a" "t")
+               (list "c" "a" "b" "t")
+               (list "c" "a" "t" "b")
+               (list "b" "a" "c" "t")
+               (list "a" "b" "c" "t")
+               (list "a" "c" "b" "t")
+               (list "a" "c" "t" "b")))
+
+; 1String Word -> List-of-words
+(define (insert-everywhere letter word)
+  (cond [(empty? word) (list (list letter))]
+        [(cons? word) (append (list (cons letter word))
+                              (add-letter-to-first
+                               (first word)
+                               (insert-everywhere letter (rest word))))]))
+(check-expect (insert-everywhere "d" '())
+              (list (list "d")))
+(check-expect (insert-everywhere "d" (list "r"))
+              (list (list "d" "r")
+                    (list "r" "d")))
+(check-expect (insert-everywhere "d" (list "e" "r"))
+              (list (list "d" "e" "r")
+                    (list "e" "d" "r")
+                    (list "e" "r" "d")))
+(check-expect (insert-everywhere "d" (list "e" "r" "a"))
+              (list (list "d" "e" "r" "a")
+                    (list "e" "d" "r" "a")
+                    (list "e" "r" "d" "a")
+                    (list "e" "r" "a" "d")))
+
+; String List-of-words -> List-of-words
+(define (add-letter-to-first l low)
+  (cond [(empty? low) '()]
+        [(cons? low) (append (list (cons l (first low)))
+                             (add-letter-to-first l (rest low)))]))
+(check-expect (add-letter-to-first "d" (list (list "r")))
+              (list (list "d" "r")))
+(check-expect (add-letter-to-first "e" (list (list "d" "r")
+                                             (list "r" "d")))
+              (list (list "e" "d" "r")
+                    (list "e" "r" "d")))
+
+
+;e214.
+; String -> List-of-strings
+; finds all words that use the same letters as s
+(define (alternative-words s)
+  (in-dictionary
+   (words->strings
+    (arrangements (string->word s)))))
+
+; List-of-strings -> Boolean 
+(define (all-words-from-rat? w)
+  (and (member? "rat" w)
+       (member? "art" w)
+       (member? "tar" w)))
+
+(check-satisfied (alternative-words "rat")
+                 all-words-from-rat?)
+
+;e215.-e219.
+
+;e220.
+(define WIDTH.e220 10) ; # of blocks, horizontally
+(define HEIGHT.e220 10); # of blocks, vertically
+(define SIZE.e220 10) ; blocks are squares
+(define SCENE-SIZE (* WIDTH.e220 SIZE.e220))
+(define SCENE-HEIGHT (* HEIGHT.e220 SIZE.e220))
+
+(define BLOCK ; red squares with black rims
+  (overlay
+   (square SIZE.e220 "outline" "black")
+   (square SIZE.e220 "solid" "red")))
+
+(define-struct tetris [block landscape])
+(define-struct block [x y])
+ 
+; A Tetris is a structure:
+;   (make-tetris Block Landscape)
+; A Landscape is one of: 
+; – '() 
+; – (cons Block Landscape)
+; A Block is a structure:
+;   (make-block N N)
+ 
+; interpretations
+; (make-block x y) depicts a block whose left 
+; corner is (* x SIZE) pixels from the left and
+; (* y SIZE) pixels from the top;
+; (make-tetris b0 (list b1 b2 ...)) means b0 is the
+; dropping block, while b1, b2, and ... are resting
+(define landscape0 (list (make-block 0 0)
+                         (make-block 1 1)
+                         (make-block 9 9)
+                         (make-block 6 9)))
+(define block-dropping (make-block 4 4))
+(define tetris0 (make-tetris (make-block 4 1)
+                             (list (make-block 0 (- HEIGHT.e220 1)))))
+
+(define block-landed (make-block 0 (- HEIGHT.e220 1)))
+
+(define block-on-block (make-block 0 (- HEIGHT.e220 2)))
+
+
+(define BACKGROUND.e220 (empty-scene SCENE-SIZE SCENE-HEIGHT))
+; Render a tetris game into an image
+; Tetris -> Image
+(define (tetris-render t)
+  (render-block (tetris-block t) (render-landscape (tetris-landscape t))))
+
+; Render a tetris block on the scene
+; Block -> Image
+(define (render-block b bg)
+  (overlay/xy BLOCK (* -1 (block-x b) SIZE.e220) (* -1 (block-y b) SIZE.e220) bg))
+(check-expect (render-block (make-block 1 1) BACKGROUND.e220)
+              (overlay/xy BLOCK -10 -10 BACKGROUND.e220))
+
+; Render a tetris landscape on the scene
+; Landscape -> Image
+(define (render-landscape l)
+  (cond [(empty? l) BACKGROUND.e220]
+        [(cons? l) (render-block (first l) (render-landscape (rest l)))]))
+(check-expect (render-landscape (list (make-block 1 1)
+                                      (make-block 1 2)))
+              (overlay/xy BLOCK -10 -20
+                          (overlay/xy BLOCK -10 -10 BACKGROUND.e220)))
+
+;e221.
+(define (tetris-main t0)
+  (big-bang t0
+    [on-tick tetris-drop 1]
+    [on-key keyh.e222]
+    [to-draw tetris-render]
+    [stop-when tetris-gameover]))
+
+; Compute next tick on tetris world state
+; - if:   the block overlaps, it stops moving, add a new random block
+; - if:   the block touches the ground, it stops moving, add a new random block
+; - else: the block drops 1 unit
+; Tetris -> Tetris
+(define (tetris-drop t0)
+  (cond [(block-overlap? t0) (block-freeze t0)]
+        [(block-ground? t0) (block-freeze t0)]
+        [else (block-drop t0)]))
+
+;Freeze the dropping block, add a new random dropping block.
+;Tetris -> Tetris
+(define (block-freeze t)
+  (make-tetris (make-block (random SIZE.e220) 0)
+               (cons (tetris-block t) (tetris-landscape t))))
+(check-random (block-freeze (make-tetris (make-block 2 8)
+                                         (list (make-block 2 9))))
+              (make-tetris (make-block (random SIZE.e220) 0)
+                           (list (make-block 2 8)
+                                 (make-block 2 9))))
+
+;Tetris -> Boolean
+(define (block-overlap? t)
+  (member? (make-block (block-x (tetris-block t))
+                       (+ 1 (block-y (tetris-block t))))
+           (tetris-landscape t)))
+(check-expect (block-overlap? (make-tetris (make-block 2 8)
+                                           (list (make-block 2 9)))) #t)
+(check-expect (block-overlap? (make-tetris (make-block 0 0)
+                                           (list (make-block 2 8)))) #f)
+
+;Tetris -> Boolean
+(define (block-ground? t)
+  (if (= (- HEIGHT.e220 1) (block-y (tetris-block t)))
+      #t
+      #f))
+(check-expect (block-ground? (make-tetris block-landed '()))
+              #t)
+(check-expect (block-ground? (make-tetris block-on-block '()))
+              #f)
+
+;Tetris -> Tetris
+(define (block-drop t)
+  (if (or (block-ground? t)
+          (block-overlap? t))
+      t
+      (make-tetris (make-block (block-x (tetris-block t))
+                               (+ 1 (block-y (tetris-block t))))
+                   (tetris-landscape t))))
+(check-expect (block-drop (make-tetris (make-block 2 8)
+                                       (list (make-block 2 14))))
+              (make-tetris (make-block 2 9)
+                           (list (make-block 2 14))))
+
+;e222.
+(define (keyh.e222 t ke)
+  (cond [(key=? ke "left") (move-block -1 t)]
+        [(key=? ke "right") (move-block 1 t)]
+        [(key=? ke "down") (block-drop t)]
+        [else t]))
+
+;move the dropping block n unit directional, within the border
+;Tetris n -> Tetris
+(define (move-block n t)
+  (cond [(> 0 n)
+         (if (or (block-touch-border? n t)
+                 (block-x-overlap? n t))
+             t
+             (make-tetris (make-block (+ n (block-x (tetris-block t)))
+                                      (block-y (tetris-block t)))
+                          (tetris-landscape t)))]
+        [else (if (or (block-touch-border? n t)
+                      (block-x-overlap? n t))
+                  t
+                  (make-tetris (make-block (+ n (block-x (tetris-block t)))
+                                           (block-y (tetris-block t)))
+                               (tetris-landscape t)))]
+        ))
+(check-expect (move-block 1 (make-tetris (make-block 2 8) '()))
+              (make-tetris (make-block 3 8) '()))
+(check-expect (move-block 1 (make-tetris (make-block 2 8)
+                                         (list (make-block 3 8))))
+              (make-tetris (make-block 2 8)
+                           (list (make-block 3 8))))
+(check-expect (move-block -1 (make-tetris (make-block 2 8)
+                                          (list (make-block 1 8))))
+              (make-tetris (make-block 2 8) (list (make-block 1 8))))
+(check-expect (move-block -1 (make-tetris (make-block 2 8) '()))
+              (make-tetris (make-block 1 8) '()))
+(check-expect (move-block -1 (make-tetris (make-block 0 8) '()))
+              (make-tetris (make-block 0 8) '()))
+(check-expect (move-block 1 (make-tetris (make-block (- SIZE.e220 1) 8) '()))
+              (make-tetris (make-block (- SIZE.e220 1) 8) '()))
+
+(define (block-touch-border? n t)
+  (cond [(and (<= 0 (+ n (block-x (tetris-block t))))
+              (< (+ n (block-x (tetris-block t))) SIZE.e220)) #f]
+        [else #t]))
+
+;Check whether the block can move x axis
+(define (block-x-overlap? x t)
+  (member? (make-block (+ x (block-x (tetris-block t)))
+                       (block-y (tetris-block t)))
+           (tetris-landscape t)))
+
+;e223.
+(define (tetris-gameover t)
+  (if (empty? (tetris-landscape t)) #f
+      (if (= 0 (block-y (first (tetris-landscape t))))
+          #t #f)))
+
+(check-expect (tetris-gameover (make-tetris (make-block 2 8)
+                                            (list (make-block 2 0))))
+              #t)
+(check-expect (tetris-gameover (make-tetris (make-block 2 8) '()))
+              #f)
+(check-expect (tetris-gameover (make-tetris (make-block 2 8)
+                                            (list (make-block 2 9))))
+              #f)
+
+(define emtpy-tetris (make-tetris (make-block (random SIZE.e220) -1)
+                                  '()))
+
+;(tetris-main emtpy-tetris)
+
+;e224-e225.
+
+;e226.
+; An FSM is one of:
+;   – '()
+;   – (cons Transition FSM)
+ 
+(define-struct transition [current next])
+; A Transition is a structure:
+;   (make-transition FSM-State FSM-State)
+ 
+; FSM-State is a Color.
+ 
+; interpretation An FSM represents the transitions that a
+; finite state machine can take from one state to another 
+; in reaction to keystrokes
+
+(define (state=? state1 state2)
+  (string=? state1 state2))
+
+;e227.
+(define fsm-bw
+  (list (make-transition "black" "white")
+        (make-transition "white" "black")))
+
+;e228.
+(define fsm-traffic
+  (list (make-transition "red" "green")
+        (make-transition "green" "yellow")
+        (make-transition "yellow" "red")))
+
+(define-struct fs [fsm current])
+; A SimulationState.v2 is a structure: 
+;   (make-fs FSM FSM-State)
+
+; FSM FSM-State -> FSM-State
+; finds the state representing current in transitions
+; and retrieves the next field 
+(check-expect (find fsm-traffic "red") "green")
+(check-expect (find fsm-traffic "green") "yellow")
+(check-error (find fsm-traffic "black")
+             "not found: black")
+(define (find transitions current)
+  (cond [(empty? transitions) (error (string-append "not found: " current))]
+        [(cons? transitions) (if (state=? current
+                                          (transition-current
+                                           (first transitions)))
+                                 (transition-next (first transitions))
+                                 (find (rest transitions) current))]))
+
+; SimulationState.v2 KeyEvent -> SimulationState.v2
+; finds the next state from ke and cs
+(check-expect
+ (find-next-state (make-fs fsm-traffic "red") "n")
+ (make-fs fsm-traffic "green"))
+(check-expect
+ (find-next-state (make-fs fsm-traffic "red") "a")
+ (make-fs fsm-traffic "green"))
+(define (find-next-state an-fsm ke)
+  (make-fs
+   (fs-fsm an-fsm)
+   (find (fs-fsm an-fsm) (fs-current an-fsm))))
+
+; SimulationState.v2 -> Image 
+; renders current world state as a colored square 
+ 
+(check-expect (state-as-colored-square
+               (make-fs fsm-traffic "red"))
+              (square 100 "solid" "red"))
+(define (state-as-colored-square an-fsm)
+  (square 100 "solid" (fs-current an-fsm)))
+
+; FSM FSM-State -> SimulationState.v2 
+; match the keys pressed with the given FSM 
+(define (simulate.v2 an-fsm s0)
+  (big-bang (make-fs an-fsm s0)
+    [to-draw state-as-colored-square]
+    [on-key find-next-state]))
+
+;e229.
+(define-struct ktransition [current key next])
+; A Transition.v2 is a structure:
+;   (make-ktransition FSM-State KeyEvent FSM-State)
+(define fsm-e109 (list (make-ktransition "AA" "a" "BB")
+                       (make-ktransition "BB" "b" "BB")
+                       (make-ktransition "BB" "c" "BB")
+                       (make-ktransition "BB" "d" "DD")))
+
+;check if the key match the transition
+;KeyEvent KTransition -> Boolean
+(define (fsm-key? ke ktrans)
+  (if (key=? ke (ktransition-key ktrans)) #t #f))
+
+;KTransition CurrentState Key -> NextState
+(define (find.v2 ktransitions current ke)
+  (cond [(empty? ktransitions) (error (string-append "not found: " current))]
+        [(cons? ktransitions) (if (and (state=? current (ktransition-current
+                                                         (first ktransitions)))
+                                       (fsm-key? ke (first ktransitions)))
+                                  (ktransition-next (first ktransitions))
+                                  (find.v2 (rest ktransitions) current ke))]))
+(check-expect (find.v2 fsm-e109 "AA" "a") "BB")
+(check-expect (find.v2 fsm-e109 "BB" "b") "BB")
+(check-expect (find.v2 fsm-e109 "BB" "c") "BB")
+(check-expect (find.v2 fsm-e109 "BB" "d") "DD")
+(check-error (find.v2 fsm-e109 "black" "e")
+             "not found: black")
+
+(define (find-next-state.e109 an-fsm ke)
+  (make-fs
+   (fs-fsm an-fsm)
+   (find.v2 (fs-fsm an-fsm) (fs-current an-fsm) ke)))
+
+; FSM FSM-State -> SimulationState.v2 
+; match the keys pressed with the given FSM 
+(define (simulate.e229 an-fsm s0)
+  (big-bang (make-fs an-fsm s0)
+    [to-draw render-text]
+    [on-key find-next-state.e109]))
+
+(define (render-text kfs)
+  (text (fs-current kfs) 20 "black"))
+
+;(simulate.e229 fsm-e109 "AA")
+
+;e230.
