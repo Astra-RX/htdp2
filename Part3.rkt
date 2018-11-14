@@ -1,13 +1,13 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
-#reader(lib "htdp-intermediate-reader.ss" "lang")((modname Part3) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #f #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp")) #f)))
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname Part3) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #f #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp")) #f)))
 ;e235.
-; String Los -> Boolean
+; [X] [List-of X] -> Boolean
 ; determines whether l contains the string s
 (define (contains? s l)
   (cond
     [(empty? l) #false]
-    [else (or (string=? (first l) s)
+    [else (or (equal? (first l) s)
               (contains? s (rest l)))]))
 
 (define (contains-atom? l)
@@ -193,3 +193,190 @@
           [(< 0 n) (add-to-end (1row n) (add-last 0 (identityM (- n 1))))])))
 
 ;e263.
+(inf.v2 (list 2 1 3))
+
+;e264.
+;(sup (list 2 1 3))
+
+;e265.
+
+;e266.
+
+;e267.
+(define USD-EURO 1.06)
+; List-of-USD Number -> List-of-EURO
+(define (convert-euro lous rate)
+  (local ((define (convert usd)
+            (* usd USD-EURO)))
+    (map convert lous)))
+(check-expect (convert-euro '(1) USD-EURO) '(1.06))
+
+; List-of-Fahreiheit -> List-of-Celsius
+(define (convertFC lof)
+  (local ((define (f2c f)
+            (* 5/9 (- f 32))))
+    (map f2c lof)))
+(check-expect (convertFC '(32)) '(0))
+
+;e268.
+(define-struct inventory [name description a-price s-price])
+; List-of-Inventory -> List-of-Inventory
+(define (sortInv loi)
+  (local ((define (cmp i1 i2)
+            (> (- (inventory-a-price i1) (inventory-s-price i1))
+               (- (inventory-a-price i2) (inventory-s-price i2)))))
+    (sort loi cmp)))
+(check-expect (sortInv `(,(make-inventory "B" "ddd" 1 3)
+                         ,(make-inventory "A" "ddd" 1 2)
+                         ,(make-inventory "C" "ddd" 2 5)))
+              `(,(make-inventory "A" "ddd" 1 2)
+                ,(make-inventory "B" "ddd" 1 3)
+                ,(make-inventory "C" "ddd" 2 5)))
+
+;e269-274.
+
+;e275-278.
+
+;e279.
+;1,3,4
+
+;e280.
+;1. 3
+;2. 14
+;3. 13.25
+
+;e281.
+(lambda (x) (< x 10))
+(lambda (a b) (number->string (* a b)))
+(lambda (n) (if (odd? n) 1 0))
+(lambda (inv1 inv2) (> (inventory-s-price inv1) (inventory-s-price inv2)))
+(lambda (posn bg) (overlay/xy (- 0 (posn-x posn)) (- 0 (posn-y posn)) bg))
+
+;e282.
+(define (f-plain x)
+  (* 10 x))
+(define f-lambda
+  (lambda (x)
+    (* 10 x)))
+
+; Number -> Boolean
+(define (compare x)
+  (= (f-plain x) (f-lambda x)))
+
+;e283.
+(map (lambda (x) (* 10 x))
+     '(1 2 3))
+
+;e284.
+
+;e285.
+; List-of-USD Number -> List-of-EURO
+(define (convert-euro-lambda lous rate)
+  (map (lambda (usd) (* rate usd)) lous))
+(check-expect (convert-euro-lambda '(1) USD-EURO) '(1.06))
+
+; List-of-Fahreiheit -> List-of-Celsius
+(define (convertFC-lambda lof)
+  (map (lambda (f) (* 5/9 (- f 32))) lof))
+(check-expect (convertFC-lambda '(32)) '(0))
+
+;e286-e290.
+
+;e291.
+(define (map-via-fold fp l)
+  l)
+
+;e292.
+; [X X -> Boolean] [NEList-of X] -> Boolean 
+; determines whether l is sorted according to cmp
+ 
+(check-expect ((sorted <) '(1 2 3)) #true)
+(check-expect ((sorted <) '(2 1 3)) #false)
+ 
+(define (sorted cmp)
+  (lambda (l0)
+    (local ((define (sorted/l l0)
+              (cond [(empty? (rest l0)) #t]
+                    [(cons? l0) (and (cmp (first l0) (first (rest l0)))
+                                     (sorted/l (rest l0)))])))
+      (if (empty? l0) #true (sorted/l l0)))))
+
+
+;e293.
+; X [List-of X] -> [Maybe [List-of X]]
+; returns the first sublist of l that starts
+; with x, #false otherwise
+(define (find x l)
+  (cond
+    [(empty? l) #false]
+    [else
+     (if (equal? (first l) x) l (find x (rest l)))]))
+
+; X [List-of X] -> [[List-of X] -> Boolean]
+(define (found? x l)
+  (lambda (l0)
+    (cond [(equal? #f l0) (if (member? x l) #f #t)]
+          [else (andmap (lambda (x) (member? x l)) l0)])))
+
+(check-satisfied (find 2 '(1 2 3 "4" 5))
+                 (found? 2 '(1 2 3 "4" 5)))
+(check-satisfied (find 25 '("1" "2" 3 4 5))
+                 (found? 25 '("1" "2" 3 4 5)))
+
+;e294.
+; X [List-of X] -> [Maybe N]
+; determine the index of the first occurrence
+; of x in l, #false otherwise
+(define (index x l)
+  (cond
+    [(empty? l) #false]
+    [else (if (equal? (first l) x)
+              0
+              (local ((define i (index x (rest l))))
+                (if (boolean? i) i (+ i 1))))]))
+
+(define (contains-l? a b)
+  (andmap (lambda (a-i) (member? a-i b)) a))
+
+(define (get n l)
+  (cond [(= n 0) (if (empty? l) (error "n is larger than the length of l") (first l))]
+        [(> n 0) (if (empty? l) (error "n is larger than the length of l")
+                     (get (- n 1) (rest l)))]))
+
+; X [List-of X] -> [X [List-of X] -> Boolean]
+(define (is-index? x l)
+  (lambda (l0)
+    (cond [(equal? l0 #f) (not (member? x l))]
+               [else (equal? x (get l0 l))])))
+
+(check-satisfied (index 4 '("1" "a" 3 4 6 88)) (is-index? 4 '("1" "a" 3 4 6 88)))
+
+;e295.
+
+;e296.
+
+;e297.
+
+;e298.
+; An ImageStream is a function: 
+;   [N -> Image]
+; interpretation a stream s denotes a series of images
+
+; ImageStream
+(define (create-rocket-scene height)
+  (place-image (triangle 10 "solid" "red") 50 height (empty-scene 60 60)))
+
+(define (my-animate s n)
+  (big-bang n
+      [on-tick (lambda (n) (- n 1))]
+      [to-draw s]))
+
+;e299.
+;use predicate to define a set
+(define (mk-set predicate)
+  (lambda (n)
+    (predicate n)))
+
+(mk-set (lambda (n) (odd? n)))
+(mk-set (lambda (n) (even? n)))
+(mk-set (lambda (n) (= 0 (modulo n 10))))
