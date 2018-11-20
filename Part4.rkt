@@ -258,3 +258,399 @@
 ; An S-expr is one of: 
 ; – X
 ; – [List-of S-expr]
+
+;e322.
+(define-struct no-info [])
+(define NONE (make-no-info))
+ 
+(define-struct node [ssn name left right])
+; A BT (short for BinaryTree) is one of:
+; – NONE
+; – (make-node Number Symbol BT BT)
+
+(make-node
+ 15
+ 'd
+ NONE
+ (make-node
+  24 'i NONE NONE))
+;     15
+;     /\
+;    /  \
+;  NONE  24
+;        /\
+;       /  \
+;     NONE NONE
+
+	
+(make-node
+ 15
+ 'd
+ (make-node
+  87 'h NONE NONE)
+ NONE)
+;       15
+;       /\
+;      /  \
+;     87  NONE
+;     /\
+;    /  \
+;  NONE NONE
+
+;e323.
+;If the tree contains a node structure whose ssn field is n, the function produces the value of the name field in that node. Otherwise, the function produces #false.
+;Number BT -> [Maybe Symbol]
+(define (search-bt ssn bt)
+  (local ((define (combine bt1 bt2)
+            (if (equal? #f bt1) bt2 bt1)))
+    (cond [(no-info? bt) #f]
+          [else (if (equal? (node-ssn bt) ssn) (node-name bt)
+                    (combine (search-bt ssn (node-left bt))
+                             (search-bt ssn (node-right bt))))])))
+(define bt1 (make-node 63 'a
+                       (make-node 29 'b
+                                  (make-node 15 'd
+                                             (make-node 10 'h NONE NONE)
+                                             (make-node 24 'i NONE NONE))
+                                  NONE)
+                       (make-node 89 'c
+                                  (make-node 77 'l NONE NONE)
+                                  (make-node 95 'g
+                                             NONE
+                                             (make-node 99 'o NONE NONE)))))
+(check-expect (search-bt 77 bt1) 'l)
+(check-expect (search-bt 89 bt1) 'c)
+
+;e324.
+;It consumes a binary tree and produces the sequence of all the ssn numbers in the tree as they show up from left to right when looking at a tree drawing.
+;BT -> [List-of Number]
+(define (inorder bt)
+  (local ()
+    (cond [(no-info? bt) '()]
+          [else (append (inorder (node-left bt))
+                        (list (node-ssn bt)) 
+                        (inorder (node-right bt)))])))
+(check-expect (inorder bt1) '(10 15 24 29 63 77 89 95 99))
+
+;e325.
+;The function consumes a number n and a BST. If the tree contains a node whose ssn field is n, the function produces the value of the name field in that node. Otherwise, the function produces NONE.
+;Number BST -> [Symbol or NONE]
+(define (search-bst ssn bst)
+  (local ()
+    (cond [(no-info? bst) NONE]
+          [else (cond [(= ssn (node-ssn bst)) (node-name bst)]
+                      [(< ssn (node-ssn bst)) (search-bst ssn (node-left bst))]
+                      [(> ssn (node-ssn bst)) (search-bst ssn (node-right bst))])])))
+(check-expect (search-bst 89 bt1) 'c)
+(check-expect (search-bst 999 bt1) NONE)
+(check-expect (search-bst 10 bt1) 'h)
+
+;e326.
+;It consumes a BST B, a number N, and a symbol S. It produces a BST that is just like B and that in place of one NONE subtree contains the node structure
+;BST Number Symbol -> BST
+(define (create-bst bst n sym)
+  (local ((define (insert bst n sym)
+            (make-node (node-ssn bst) (node-name bst)
+                       (make-node n
+                                  sym
+                                  (node-left bst) NONE)
+                       (node-right bst))))
+    (cond [(no-info? bst) (make-node n sym NONE NONE)]
+          [else (cond [(= n (node-ssn bst))
+                       (insert bst n sym)]
+                      [(< n (node-ssn bst))
+                       (make-node (node-ssn bst) (node-name bst)
+                                  (create-bst (node-left bst) n sym)
+                                  (node-right bst))]
+                      [(> n (node-ssn bst))
+                       (make-node (node-ssn bst) (node-name bst)
+                                  (node-left bst)
+                                  (create-bst (node-right bst) n sym))])])))
+(check-expect (inorder (create-bst bt1 22 'z)) '(10 15 22 24 29 63 77 89 95 99))
+(check-expect (inorder (create-bst bt1 999 'z)) '(10 15 24 29 63 77 89 95 99 999))
+(check-expect (inorder (create-bst bt1 10 'z)) '(10 10 15 24 29 63 77 89 95 99))
+
+;e327.
+;It consumes a list of numbers and names and produces a BST by repeatedly applying create-bst.
+; [List-of [List Number Symbol]] -> BST
+(define (create-bst-from-list list)
+  (foldr (lambda (pair bst)
+           (create-bst bst (first pair) (second pair)))
+         NONE list))
+;using foldr or foldl will result in different structure.
+(check-expect (create-bst-from-list '((99 o)
+                                      (77 l)
+                                      (24 i)
+                                      (10 h)
+                                      (95 g)
+                                      (15 d)
+                                      (89 c)
+                                      (29 b)
+                                      (63 a)))
+              bt1)
+
+;e328.
+; S-expr Symbol Atom -> S-expr
+; replaces all occurrences of old in sexp with new
+ 
+(check-expect (substitute.e328 '(((world) bye) bye) 'bye '42)
+              '(((world) 42) 42))
+(check-expect (substitute.e328 '(((world bye) "hello") 42) 'bye '42)
+              '(((world 42) "hello") 42))
+ 
+(define (substitute.e328 sexp old new)
+  (cond
+    [(atom? sexp) (if (equal? sexp old) new sexp)]
+    [else (map (lambda (s) (substitute.e328 s old new)) sexp)]))
+
+;e329.
+
+;e330.
+; A Dir.v1 (short for directory) is one of: 
+; – '()
+; – (cons File.v1 Dir.v1)
+; – (cons Dir.v1 Dir.v1)
+ 
+; A File.v1 is a String.
+
+(define fig.123.cons (cons (cons "part1" (cons "part2" (cons "part3" '())))
+                           (cons "read!"
+                                 (cons (cons (cons "hang" (cons "draw" '()))
+                                             (cons (cons "read!" '())
+                                                   '()))
+                                       '()))))
+(define fig.123 '(("part1" "part2" "part3")
+                  "read!"
+                  (("hang" "draw")
+                   ("read!"))))
+
+;e331.
+;determines how many files a given Dir.v1 contains
+;Dir.v1 -> Number
+(define (how-many dir)
+  (cond [(empty? dir) 0]
+        [else (+ (if (string? (first dir))
+                     1 
+                     (how-many (first dir)))
+                 (how-many (rest dir)))]))
+(check-expect (how-many fig.123) 7)
+
+;e332.
+(define-struct dir.v2 [name content])
+; A Dir.v2 is a structure: 
+;   (make-dir String LOFD)
+ 
+; An LOFD (short for list of files and directories) is one of:
+; – '()
+; – (cons File.v2 LOFD)
+; – (cons Dir.v2 LOFD)
+ 
+; A File.v2 is a String.
+
+(define fig.123.v2 (make-dir.v2 "TS"
+                                (list (make-dir.v2 "Text"
+                                                   (list "part1" "part2" "part3"))
+                                      "read!"
+                                      (make-dir.v2 "Libs"
+                                                   (list (make-dir.v2 "Code"
+                                                                      (list "hang" "draw"))
+                                                         (make-dir.v2 "Docs"
+                                                                      (list "read!" )))))))
+
+;e333.
+(check-expect (how-many.v2 fig.123.v2) 7)
+(define (how-many.v2 dir)
+  (local ((define (how-many-lofd lofd)
+            (cond [(empty? lofd) 0]
+                  [else (+ (cond [(string? (first lofd)) 1]
+                                 [(dir.v2? (first lofd)) (how-many.v2 (first lofd))])
+                           (how-many-lofd (rest lofd)))])))
+    (how-many-lofd (dir.v2-content dir))))
+
+;e334.
+;modify dir structure
+;(define-struct dir [name content size attr])
+
+;e335.
+;(define-struct file [name size content])
+; A File.v3 is a structure: 
+;   (make-file String N String)
+
+(define-struct dir.v3 [name dirs files])
+; A Dir.v3 is a structure: 
+;   (make-dir.v3 String Dir* File*)
+ 
+; A Dir* is one of: 
+; – '()
+; – (cons Dir.v3 Dir*)
+ 
+; A File* is one of: 
+; – '()
+; – (cons File.v3 File*)
+
+(define fig.123.v3
+  (make-dir "TS"
+            (list (make-dir "Text"
+                            (list)
+                            (list (make-file "part1" 99 "")
+                                  (make-file "part2" 52 "")
+                                  (make-file "part3" 17 "")))
+                  (make-dir "Libs"
+                            (list (make-dir "Code"
+                                            (list)
+                                            (list (make-file "hang" 8 "")
+                                                  (make-file "draw" 2 "")))
+                                  (make-dir "Docs"
+                                            (list)
+                                            (list (make-file "read!" 19 ""))))
+                            (list)))
+            (list (make-file "read!" 10 ""))))
+
+;e336.
+;determines how many files a given Dir.v3 contains.
+;Dir.v3 -> Number
+(define (how-many.v3 dir)
+  (local ((define (how-many-dir* dir*)
+            (foldr (lambda (dir count)
+                     (+ count (how-many.v3 dir))) 0 dir*)))
+    (;(dir-name dir)
+     + (how-many-dir* (dir-dirs dir))
+       (length (dir-files dir)))))
+(check-expect (how-many.v3 fig.123.v3) 7)
+
+;e337.
+;[Dir.v3 File.v3]
+; A Dir.v3 is a structure: 
+;   (make-dir.v3 String [List-of Dir.v3] [List-of File])
+
+(require htdp/dir)
+
+;e338.
+(define W (create-dir "z:\\artoria\\codex"))
+(define (how-many.e338 dir)
+  (local ((define (how-many-dir* dir*)
+            (foldr (lambda (dir count)
+                     (+ count (how-many.e338 dir))) 0 dir*)))
+    (;(dir.v3-name dir)
+     + (how-many-dir* (dir-dirs dir))
+       (length (dir-files dir)))))
+(how-many.e338 W)
+
+;e339.
+;consumes a Dir and a file name and determines whether or not a file with this name occurs in the directory tree.
+;Dir String -> Boolean
+(define (find? dir name)
+  (local ((define (find-dir* dir*)
+            (foldr (lambda (dir result)
+                     (or result (find? dir name))) #f dir*))
+          (define (find-files* files*)
+            (foldr (lambda (file result)
+                     (if (equal? name (file-name file))
+                         #t
+                         (or #f result)))
+                   #f files*)))
+    ;(dir-name dir)
+    (or (find-dir* (dir-dirs dir))
+        (find-files* (dir-files dir)))))
+(check-expect (find? W "Part3.rkt") #t)
+
+;e340.
+;Dir -> [List-of Dir/File]
+(define (ls dir)
+  (append (map dir-name (dir-dirs dir))
+          (map file-name (dir-files dir))))
+(ls W)
+
+;e341.
+;Dir -> Number
+(define (du dir)
+  (+ 1
+     (foldr (lambda (dir total) (+ (du dir) total)) 0 (dir-dirs dir))
+     (foldr (lambda (file total) (+ (file-size file) total)) 0 (dir-files dir))))
+(du W)
+
+;e342.
+; A Path is [List-of String].
+; interpretation directions into a directory tree
+
+;If (find? d f) is #true, find produces a path to a file with name f; otherwise it produces #false.
+;Dir string -> Path/#false
+(define (find dir name)
+  (local (;[List-of Dir] -> Path/#f
+          (define (find-dirs* dir*)
+            (cond [(empty? dir*) #f]
+                  [else (if (find? (first dir*) name)
+                            (find (first dir*) name)
+                            (find-dirs* (rest dir*)))]))
+          ;[List-of File] -> Path/#f
+          (define (find-files* files*)
+            (cond [(empty? files*) #f]
+                  [else (if (equal? (file-name (first files*))
+                                    name)
+                            (list (file-name (first files*)))
+                            (find-files* (rest files*)))]))
+          ;Path/#f -> Path/#f
+          (define (append-cur-dirname path)
+            (if (boolean? path) #f (append (list (dir-name dir)) path)))
+          (define cur-file (find-files* (dir-files dir))))
+    (if (boolean? cur-file)
+        (append-cur-dirname (find-dirs* (dir-dirs dir))) ; search sub-dir
+        (append-cur-dirname cur-file))))                 ; found in cur-dir
+
+
+;Dir String -> [List-of Path]
+(define (find-all dir name)
+  (local (;[List-of File] -> Path/[List-of String]
+          (define (find-files files*)
+            (cond [(empty? files*) '()]
+                  [else (if (equal? (file-name (first files*)) name)
+                            (list (file-name (first files*)))
+                            (find-files (rest files*)))]))
+          ;[List-of Dir] -> [List-of Path]
+          (define (find-dirs dirs)
+            (foldr append '() (map (lambda (dir) (find-all dir name)) dirs)))
+          ;local var
+          (define file-path (find-files (dir-files dir)))
+          (define sub-path (find-dirs (dir-dirs dir)))
+          ;append Path as prefix to every on in the list
+          ;[List-of Path] String -> [List-of Path]
+          (define (append-cur-dir prefix lop)
+            (map (lambda (path) (append (list prefix) path)) lop)))
+    (cond [(empty? file-path)
+           ;append prefix for paths in sub-dir
+           (append-cur-dir (dir-name dir) sub-path)]
+          [else
+           ;append file path in current dir and sub-dir
+           (append (append-cur-dir (dir-name dir) sub-path)    
+                   (list (append (list (dir-name dir)) file-path)))])))
+
+(check-expect (find-all fig.123.v3 "read!")
+              (list (list "TS" "Libs" "Docs" "read!")
+                    (list "TS" "read!")))
+;(find-all W "HEAD")
+
+;e343.
+;Dir -> [List-of Path]
+(define (ls-R dir)
+  (append (map (lambda (file) (list (dir-name dir) (file-name file))) (dir-files dir))
+          (map (lambda (path) (append (list (dir-name dir)) path))
+               (foldr append '() (map ls-R (dir-dirs dir))))))
+(check-expect (ls-R fig.123.v3)
+              (list
+               (list "TS" "read!")
+               (list "TS" "Text" "part1")
+               (list "TS" "Text" "part2")
+               (list "TS" "Text" "part3")
+               (list "TS" "Libs" "Code" "hang")
+               (list "TS" "Libs" "Code" "draw")
+               (list "TS" "Libs" "Docs" "read!")))
+
+;e344.
+;Dir name -> [List-of Path]
+(define (find-all.ls dir name)
+  (filter (lambda (path) (member? name path)) (ls-R dir)))
+(check-expect (find-all.ls fig.123.v3 "read!")
+              (list (list "TS" "read!")
+                    (list "TS" "Libs" "Docs" "read!")))
+(check-expect (find-all.ls fig.123.v3 "Docs")
+              (list (list "TS" "Libs" "Docs" "read!")))
