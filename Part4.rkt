@@ -654,3 +654,288 @@
                     (list "TS" "Libs" "Docs" "read!")))
 (check-expect (find-all.ls fig.123.v3 "Docs")
               (list (list "TS" "Libs" "Docs" "read!")))
+
+;e345.
+(define-struct add [left right])
+(define-struct mul [left right])
+
+;BSL-expr definition
+; - (make-add sub-BSL sub-BSL)
+; - (make-nul sub-BSL sub-BSL)
+
+;sub-BSL
+; - Number
+; - BSL-expr
+
+(make-add 10 -10)
+(make-add (make-mul 20 3) 33)
+(make-add (make-mul 3.14 (make-mul 2 3)) (make-mul 3.14 (make-mul -1 -9)))
+
+(+ -1 -2)
+(+ (* -2 -3) 33)
+(* (+ 1 (* 2 3)) 3.14)
+
+;e346.
+;BSL-value
+; - Number
+
+;BSL-expr
+; - BSL-value
+; - (make-add BSL-expr BSL-expr)
+; - (make-mul BSL-expr BSL-expr)
+
+;e347.
+(define (eval-expression bsl)
+  (cond [(number? bsl) bsl]
+        [(add? bsl) (+ (eval-expression (add-left bsl)) (eval-expression (add-right bsl)))]
+        [(mul? bsl) (* (eval-expression (mul-left bsl)) (eval-expression (mul-right bsl)))]))
+(check-expect (eval-expression (make-add 10 -10)) 0)
+(check-expect (eval-expression (make-add (make-mul -2 -3) 33)) 39)
+
+;e348.
+;BSL-Bool
+; - Boolean
+
+(define-struct and* [list*])
+(define-struct or* [list*])
+(define-struct not* [b])
+;BSL-bool-expr
+; - BSL-Bool
+; - (make-and [List-of BSL-Bool])
+; - (make-or [List-of BSL-Bool])
+; - (make-not [BSL-Bool])
+
+(define (eval-bool-expression bsl-b)
+  (cond [(boolean? bsl-b) bsl-b]
+        [(and*? bsl-b) (foldr (lambda (b result)
+                                (and (eval-bool-expression b) result))
+                              #t (and*-list* bsl-b))]
+        [(or*? bsl-b) (foldr (lambda (b result)
+                               (or (eval-bool-expression b) result))
+                             #f (or*-list* bsl-b))]
+        [(not*? bsl-b) (not (not*-b bsl-b))]))
+(check-expect (eval-bool-expression (make-and* (list (make-and* (list #t #f))
+                                                     (make-or* (list #f #f))
+                                                     #t))) #f)
+(check-expect (eval-bool-expression (make-not* #f)) #t)
+
+;e349.
+; S-expr -> BSL-expr
+(define (parse s)
+  (cond
+    [(atom? s) (parse-atom s)]
+    [else (parse-sl s)]))
+(check-expect (parse '(+ (* 2 3) 4)) (make-add (make-mul 2 3) 4))
+
+(define WRONG "WRONG")
+; SL -> BSL-expr 
+(define (parse-sl s)
+  (local ((define L (length s)))
+    (cond
+      [(< L 3) (error WRONG)]
+      [(and (= L 3) (symbol? (first s)))
+       (cond
+         [(symbol=? (first s) '+)
+          (make-add (parse (second s)) (parse (third s)))]
+         [(symbol=? (first s) '*)
+          (make-mul (parse (second s)) (parse (third s)))]
+         [else (error WRONG)])]
+      [else (error WRONG)])))
+(check-expect (parse-sl '(+ 3 4)) (make-add 3 4))
+(check-expect (parse-sl '(* 3 4)) (make-mul 3 4))
+(check-error (parse-sl '(* 3 4 5)) WRONG)
+(check-error (parse-sl '(* 3)) WRONG)
+(check-error (parse-sl '(= 3 4)) WRONG)
+ 
+; Atom -> BSL-expr 
+(define (parse-atom s)
+  (cond
+    [(number? s) s]
+    [(string? s) (error WRONG)]
+    [(symbol? s) (error WRONG)]))
+(check-expect (parse-atom 49) 49)
+(check-error (parse-atom "atom") WRONG)
+(check-error (parse-atom 'symbol) WRONG)
+
+;e350.
+
+;e351.
+;S-expr -> BSL-value
+(define (interpreter-expr sexp)
+  (eval-expression (parse sexp)))
+
+(check-expect (interpreter-expr '(+ (* 2 3) 4)) 10)
+(check-error (parse '(+ (* 2 3 4) 4)) WRONG)
+
+;e352.
+; A BSL-var-expr is one of: 
+; – Number
+; – Symbol 
+; – (make-add BSL-var-expr BSL-var-expr)
+; – (make-mul BSL-var-expr BSL-var-expr)
+
+(define (subst bsl-v sym n)
+  (cond [(add? bsl-v) (make-add (subst (add-left bsl-v) sym n)
+                                (subst (add-right bsl-v) sym n))]
+        [(mul? bsl-v) (make-mul (subst (mul-left bsl-v) sym n)
+                                (subst (mul-right bsl-v) sym n))]
+        [(equal? bsl-v sym) n]
+        [else bsl-v]))
+(check-expect (subst (make-add 4 (make-mul 'x 5)) 'x 5) (make-add 4 (make-mul 5 5)))
+
+;e353.
+;BSL-var-expr -> Boolean
+(define (numeric? bsl-v)
+  (cond [(number? bsl-v) #t]
+        [(symbol? bsl-v) #f]
+        [(add? bsl-v) (and (numeric? (add-left bsl-v)) (numeric? (add-right bsl-v)))]
+        [(mul? bsl-v) (and (numeric? (mul-left bsl-v)) (numeric? (mul-right bsl-v)))]))
+
+(check-expect (numeric? (make-add 4 (make-mul 'x 5))) #f)
+
+;e354.
+;The checked function consumes a BSL-var-expr and determines its value if numeric? yields true for the input. Otherwise it signals an error.
+;BSL-var-expr -> Boolean
+(define (eval-variable bsl)
+  (cond [(numeric? bsl) (eval-expression bsl)]
+        [else (error WRONG)]))
+(check-error (eval-variable (make-add 4 (make-mul 'x 5))) WRONG)
+(check-expect (eval-variable (make-add 4 (make-mul 4 5))) 24)
+
+; An AL (short for association list) is [List-of Association].
+; An Association is a list of two items:
+;   (cons Symbol (cons Number '())).
+
+;BSL-var-expr AL -> BSL-value
+(define (eval-variable* ex da)
+  (local ((define final (foldr (lambda (a ex)
+                                 (subst ex (first a) (second a))) ex da)))
+    (if (numeric? final) (eval-expression final)
+        (error WRONG))))
+(check-expect (eval-variable* (make-add 4 (make-mul 'x 5))
+                              (list (list 'x 5)))
+              29)
+(check-expect (eval-variable* (make-add 4 (make-mul 'x 'y))
+                              (list (list 'x 5)
+                                    (list 'y 6)))
+              34)
+(check-error (eval-variable* (make-add 4 (make-mul 'x 'y))
+                             (list (list 'x 5)))
+             WRONG)
+
+;e355.
+; BSL-var-expr AL -> Number
+(define (eval-var-lookup e da)
+  (cond [(number? e) e]
+        [(symbol? e) (local ((define found (assq e da)))
+                       (if (equal? found #f) (error WRONG)
+                           (second found)))]
+        [(add? e) (+ (eval-var-lookup (add-left e) da)
+                     (eval-var-lookup (add-right e) da))]
+        [(mul? e) (* (eval-var-lookup (mul-left e) da)
+                     (eval-var-lookup (mul-right e) da))]))
+
+(check-expect (eval-var-lookup (make-add 4 (make-mul 'x 'y))
+                               (list (list 'x 5)
+                                     (list 'y 6)))
+              34)
+(check-error (eval-var-lookup (make-add 4 (make-mul 'x 'y))
+                              (list (list 'x 5)))
+             WRONG)
+
+;e356.
+(define-struct function-call [name arg])
+
+;BSL with function
+; - Number
+; - Symbol
+; - (make-function-call Symbol Symbol)
+; - (make-add BSL BSL)
+; - (make-mul BSL BSL)
+
+(make-function-call 'k (make-add 1 1))
+(make-mul 5 (make-function-call 'k (make-add 1 1)))
+(make-mul (make-function-call 'i 5) (make-function-call 'k (make-add 1 1)))
+
+;e357.
+(define (eval-definition1 ex f x b)
+  (cond [(number? ex) ex]
+        [(symbol? ex) (error WRONG)]
+        [(function-call? ex) (if (equal? f (function-call-name ex))
+                                 (local ((define arg (function-call-arg ex))
+                                         (define value (eval-definition1 arg f x b))
+                                         (define plugd (subst b x value)))
+                                   (eval-definition1 plugd f x b))
+                                 (error WRONG))]
+        [(add? ex) (+ (eval-definition1 (add-left ex) f x b)
+                      (eval-definition1 (add-right ex) f x b))]
+        [(mul? ex) (* (eval-definition1 (mul-left ex) f x b)
+                      (eval-definition1 (mul-right ex) f x b))]))
+(check-expect (eval-definition1 (make-function-call 'k (make-add 1 (make-function-call 'k 1)))
+                                'k
+                                'x
+                                (make-add 'x 'x)) 6)
+(check-expect (eval-definition1 (make-function-call 'k (make-add 1 1))
+                                'k
+                                'x
+                                (make-mul 'x 'x)) 4)
+;(eval-definition1 (make-function-call 'f 5) 'f 'x (make-function-call 'f 3))
+
+;e358.
+(define-struct BSL-fun-def [name arg body])
+(define f (make-BSL-fun-def 'f 'x (make-add 3 'x)))
+(define g (make-BSL-fun-def 'g 'y (make-function-call 'f (make-mul 2 'y))))
+(define h (make-BSL-fun-def 'h 'v (make-add (make-function-call 'f 'v)
+                                            (make-function-call 'g 'v))))
+
+;BSL-fun-def*
+; [List-of BSL-fun-def]
+(define da-fgh (list (make-BSL-fun-def 'f 'x (make-add 3 'x))
+                     (make-BSL-fun-def 'g 'y (make-function-call 'f (make-mul 2 'y)))
+                     (make-BSL-fun-def 'h 'v (make-add (make-function-call 'f 'v)
+                                                       (make-function-call 'g 'v)))))
+
+; BSL-fun-def* Symbol -> BSL-fun-def
+; retrieves the definition of f in da
+; signals an error if there is none
+(check-expect (lookup-def da-fgh 'g) g)
+(define (lookup-def da f)
+  (local ((define found (filter (lambda (fun) (equal? f (BSL-fun-def-name fun))) da)))
+    (if (empty? found) (error WRONG)
+        (first found))))
+
+;e359.
+;BSL-fun-expr FAL BSL-fun-def* -> BSL-value
+(define (eval-function* ex da)
+  (cond [(number? ex) ex]
+        [(symbol? ex) (error WRONG)]
+        [(function-call? ex)
+         (local ((define found
+                   (lookup-def da (function-call-name ex))))
+           (if (equal? found #f) (error WRONG)
+               (local ((define arg (function-call-arg ex))
+                       (define value (eval-function* arg da))
+                       (define plugd (subst-fun (BSL-fun-def-body found)
+                                                (BSL-fun-def-arg found)
+                                                value)))
+                 (eval-function* plugd da))))]
+        [(add? ex) (+ (eval-function* (add-left ex) da)
+                      (eval-function* (add-right ex) da))]
+        [(mul? ex) (* (eval-function* (mul-left ex) da)
+                      (eval-function* (mul-right ex) da))]))
+(define (subst-fun ex sym n)
+  (cond [(add? ex) (make-add (subst-fun (add-left ex) sym n)
+                             (subst-fun (add-right ex) sym n))]
+        [(mul? ex) (make-mul (subst-fun (mul-left ex) sym n)
+                             (subst-fun (mul-right ex) sym n))]
+        [(function-call? ex)
+         (if (equal? sym (function-call-arg ex))
+             (make-function-call (function-call-name ex) n)
+             (make-function-call (function-call-name ex)
+                                 (subst-fun (function-call-arg ex) sym n)))]
+        [(equal? ex sym) n]
+        [else ex]))
+(check-expect (subst-fun (BSL-fun-def-body h) 'v 5)
+              (make-add (make-function-call 'f 5) (make-function-call 'g 5)))
+(check-expect (eval-function* (make-function-call 'h 5) da-fgh) 21)
+(check-error (eval-function* (make-function-call 'a 5) da-fgh) WRONG)
