@@ -939,3 +939,129 @@
               (make-add (make-function-call 'f 5) (make-function-call 'g 5)))
 (check-expect (eval-function* (make-function-call 'h 5) da-fgh) 21)
 (check-error (eval-function* (make-function-call 'a 5) da-fgh) WRONG)
+
+;e360.
+; BSL-da-all
+; [list-of BSL-fun-def/BSL-var-def]
+; - '()
+; - (cons BSL-fun-def BSL-da-all)
+; - (cons BSL-var-def BSL-da-all)
+
+(define-struct BSL-var-def [name expr])
+(define da-all (list (make-BSL-var-def 'a 5)
+                     (make-BSL-var-def 'b 5)
+                     (make-BSL-fun-def 'f 'x (make-add 3 'x))
+                     (make-BSL-fun-def 'g 'y (make-function-call 'f (make-mul 2 'y)))
+                     (make-BSL-fun-def 'h 'v (make-add (make-function-call 'f 'v)
+                                                       (make-function-call 'g 'v)))))
+
+; BSL-da-all Symbol -> BSL-var-def/Error
+(define (lookup-con-def da x)
+  (cond [(empty? da) (error WRONG)]
+        [(BSL-var-def? (first da)) (if (equal? x (BSL-var-def-name (first da)))
+                                       (first da)
+                                       (lookup-con-def (rest da) x))]
+        [else (lookup-con-def (rest da) x)]))
+(check-error (lookup-con-def da-all 'e) WRONG)
+(check-error (lookup-con-def da-all 'f) WRONG)
+(check-expect (lookup-con-def da-all 'a) (make-BSL-var-def 'a 5))
+
+(define (lookup-fun-def da x)
+  (local ((define found (filter (lambda (def)
+                                  (if (and (BSL-fun-def? def)
+                                           (equal? x (BSL-fun-def-name def)))
+                                      #t #f)) da)))
+    (if (empty? found) (error WRONG)
+        (first found))))
+(check-error (lookup-fun-def da-all 'e) WRONG)
+(check-error (lookup-fun-def da-all 'a) WRONG)
+(check-expect (lookup-fun-def da-all 'f) (make-BSL-fun-def 'f 'x (make-add 3 'x)))
+
+;e361.
+;BSL-fun-expr BSL-da-all -> BSL-value
+(define (eval-all ex da)
+  (cond [(number? ex) ex]
+        [(symbol? ex) (local ((define found (lookup-con-def da ex)))
+                        (BSL-var-def-expr found))]
+        [(function-call? ex)
+         (local ((define found (lookup-fun-def da (function-call-name ex)))
+                 (define arg (function-call-arg ex))
+                 (define value (eval-all arg da))
+                 (define plugd (subst-fun (BSL-fun-def-body found)
+                                          (BSL-fun-def-arg found)
+                                          value)))
+           (eval-all plugd da))]
+        [(add? ex) (+ (eval-all (add-left ex) da)
+                      (eval-all (add-right ex) da))]
+        [(mul? ex) (* (eval-all (mul-left ex) da)
+                      (eval-all (mul-right ex) da))]))
+
+(check-expect (eval-all (make-function-call 'h (make-function-call 'h 'a)) da-all) 69)
+(check-error (eval-all (make-function-call 'h 'c) da-all) WRONG)
+
+;e362.
+;S-expr Sl -> BSL-value
+(define (interpreter sexp sl)
+  (local ((define ex (parse-ex sexp))
+          (define da (parse-Sl sl)))
+    (eval-all ex da)))
+;function as value not implemented
+(check-expect (interpreter '(h 5) '((define (h x) (* x x)))) 25)
+(check-expect (interpreter '(h (h h)) '((define (h x) (* x x))
+                                        (define h 5)))
+              625)
+
+;S-expr -> BSL-fun-expr
+(define (parse-ex s)
+  (local (; Atom -> BSL-expr 
+          (define (parse-atom s)
+            (cond [(number? s) s]
+                  [(string? s) (error WRONG)]
+                  [(symbol? s) s]))
+          ; SL -> BSL-fun-expr 
+          (define (parse-sl s)
+            (local ((define L (length s)))
+              (cond [(= L 1) (error WRONG)]
+                    [(and (= L 2) (symbol? (first s)))
+                     (make-function-call (first s) (parse-ex (second s)))]
+                    [(and (= L 3) (symbol? (first s)))
+                     (cond [(symbol=? (first s) '+)
+                            (make-add (parse-ex (second s)) (parse-ex (third s)))]
+                           [(symbol=? (first s) '*)
+                            (make-mul (parse-ex (second s)) (parse-ex (third s)))]
+                           [else (error WRONG)])]
+                    [else (error WRONG)]))))
+    (cond [(atom? s) (parse-atom s)]
+          [else (parse-sl s)])))
+
+(check-expect (parse-ex '(h (h a)))
+              (make-function-call 'h (make-function-call 'h 'a)))
+(check-expect (parse-ex '(+ (* 2 3) (h (h a))))
+              (make-add (make-mul 2 3) (make-function-call 'h (make-function-call 'h 'a))))
+
+;S-expr
+; - Atom
+; - SL
+
+;SL
+; - '()
+; - (cons S SL)
+
+;[List-of S-expr] -> BSL-da-all
+(define (parse-Sl l)
+  (map (lambda (def)
+         (local ((define L (length def)))
+           (cond [(and (equal? 'define (first def))
+                       (= L 3))
+                  (cond [(symbol? (second def))
+                         (make-BSL-var-def (second def) (parse-ex (third def)))]
+                        [(list? (second def))
+                         (make-BSL-fun-def (first (second def))
+                                           (second (second def))
+                                           (parse-ex (third def)))])]
+                 [else (error WRONG)]))) l))
+
+(check-expect (parse-Sl '((define (h v) (+ 3 5))
+                          (define a 5)))
+              (list (make-BSL-fun-def 'h 'v (make-add 3 5)) (make-BSL-var-def 'a 5)))
+
