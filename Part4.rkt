@@ -1065,3 +1065,100 @@
                           (define a 5)))
               (list (make-BSL-fun-def 'h 'v (make-add 3 5)) (make-BSL-var-def 'a 5)))
 
+;e363-386.
+
+;e387.
+;[List-of Symbol] [List-of Number] -> [List-of '(Symbol Number)]
+(define (cross l1 l2)
+  (local (;[List-of Symbol] Number -> [List-of '(Symbol Number)]
+          (define (one-cross l item)
+            (cond [(empty? l) '()]
+                  [else (append (list (list (first l) item))
+                                (one-cross (rest l) item))])))
+    (foldr (lambda (item2 base)
+             (append (one-cross l1 item2) base)) '() l2)))
+(check-expect (cross '(a b c) '(1 2)) '((a 1) (b 1) (c 1) (a 2) (b 2) (c 2)))
+
+;e388.
+
+;e389.
+(define-struct phone-record [name number])
+; A PhoneRecord is a structure:
+;   (make-phone-record String String)
+;[List-of String] [List-of String] -> [List-of PhoneRecord]
+(define (zip lon lop)
+  (cond [(empty? lon) '()]
+        [else (cons (make-phone-record (first lon) (first lop))
+                    (zip (rest lon) (rest lop)))]))
+(check-expect (zip '("a" "b" "c") '("1" "2" "3"))
+              `(,(make-phone-record "a" "1")
+                ,(make-phone-record "b" "2")
+                ,(make-phone-record "c" "3")))
+
+
+;e390.
+(define-struct branch [left right])
+ 
+; A TOS is one of:
+; – Symbol
+; – (make-branch TOS TOS)
+ 
+; A Direction is one of:
+; – 'left
+; – 'right
+
+; A list of Directions is also called a path.
+; - '()
+; - (cons Direction LoD)
+
+;TOS [List-of Direction] -> Symbol
+(define (tree-pick t p)
+  (cond [(and (symbol? t) (empty? p)) t]
+        [(and (symbol? t) (cons? p)) (error "no more branches")]
+        [(and (branch? t) (empty? p)) (error "no more directions")]
+        [(and (branch? t) (cons? p))
+         (cond [(equal? (first p) 'left) (tree-pick (branch-left t) (rest p))] 
+               [(equal? (first p) 'right) (tree-pick (branch-right t) (rest p))])]))
+
+;        __B__
+;       /     \
+;      B       B
+;     / \     / \
+;    B   'c  'd  'e
+;   / \
+;  'a  'b
+(define tree.e390 (make-branch (make-branch (make-branch 'a 'b)
+                                            'c)
+                               (make-branch 'd 'e)))
+
+(define path.e390 '(left left left))
+
+(check-expect (tree-pick tree.e390 path.e390) 'a)
+(check-expect (tree-pick tree.e390 '(left right)) 'c)
+(check-expect (tree-pick tree.e390 '(right left)) 'd)
+(check-error (tree-pick tree.e390 '(right left left)) "no more branches")
+(check-error (tree-pick tree.e390 '(left)) "no more directions")
+
+;e391.
+
+;e392.
+
+;e393.
+; A Son.R is one of: 
+; – empty 
+; – (cons Number Son.R)
+; 
+; Constraint If s is a Son.R, 
+; no number occurs twice in s
+;Son.R Son.R -> Son.R
+(define (union a b)
+  (cond [(empty? a) b]
+        [else (if (member? (first a) b)
+                  (union (rest a ) b)
+                  (cons (first a) (union (rest a) b)))]))
+
+(check-expect (union '(a b) '(b c)) '(a b c))
+(check-expect (union '(a b) '()) '(a b))
+(check-expect (union '() '(a b)) '(a b))
+
+;e394-411.
