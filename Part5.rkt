@@ -607,7 +607,7 @@
           (define ab (integrate-kepler f a b))
           (define amid (integrate-kepler f a mid))
           (define midb (integrate-kepler f mid b)))
-    (cond [(< (abs (- ab amid midb)) (* (- b a) ε.inte)) ab]
+    (cond [(< (abs (- ab amid midb)) (* (- b a) ε.inte 0.1)) ab]
           [else (+ (integrate-adaptive f a mid)
                    (integrate-adaptive f mid b))])))
 (check-within (integrate-adaptive (lambda (x) 20) 12 22) 200 ε.inte)
@@ -615,3 +615,405 @@
 (check-within (integrate-adaptive (lambda (x) (* 3 (sqr x))) 0 10)
               1000
               ε.inte)
+
+;e462-470.
+
+;e471.
+(define sample-graph
+  '((A B E)
+    (B E F)
+    (C D)
+    (D)
+    (E C F)
+    (F D G)
+    (G)))
+
+;Node Graph -> [List-of Node]
+(define (neighbors n g)
+  (local ((define connections (filter (lambda (p) (equal? (first p) n)) g)))
+    (cond [(empty? connections) '()]
+          [else (rest (first connections))])))
+(check-expect (neighbors 'A sample-graph) '(B E))
+
+;e472.
+; Node Node Graph -> [Maybe Path]
+; finds a path from origination to destination in G
+; if there is no path, the function produces #false
+(define (find-path origination destination G)
+  (cond
+    [(symbol=? origination destination) (list destination)]
+    [else (local ((define next (neighbors origination G))
+                  (define candidate
+                    (find-path/list next destination G)))
+            (cond
+              [(boolean? candidate) #false]
+              [else (cons origination candidate)]))]))
+ 
+; [List-of Node] Node Graph -> [Maybe Path]
+; finds a path from some node on lo-Os to D
+; if there is no path, the function produces #false
+(define (find-path/list lo-Os D G)
+  (cond
+    [(empty? lo-Os) #false]
+    [else (local ((define candidate
+                    (find-path (first lo-Os) D G)))
+            (cond
+              [(boolean? candidate)
+               (find-path/list (rest lo-Os) D G)]
+              [else candidate]))]))
+(check-expect (find-path 'A 'G sample-graph) (list 'A 'B 'E 'F 'G))
+
+;Graph -> Boolean
+(define (test-on-all-nodes G)
+  (cond [(empty? G) #t]
+        [else (if (test-one (first (first G)) (nodes G) G)
+                  (test-on-all-nodes (rest G))
+                  #f)]))
+;Node [List-of Node] Graph -> Boolean
+(define (test-one n l G)
+  (cond [(empty? l) #t]
+        [else (local ((define side1 (find-path n (first l) G))
+                      (define side2 (find-path (first l) n G)))
+                (if (and (boolean? side1) (boolean? side2)) #f
+                    (test-one n (rest l) G)))]))
+(define (nodes G)
+  (map (lambda (c) (first c)) G))
+(check-expect (test-one 'B (nodes sample-graph) sample-graph) #t)
+(check-expect (test-one 'F (nodes sample-graph) sample-graph) #f)
+(check-expect (test-on-all-nodes sample-graph) #f)
+
+(define cyclic-graph
+  '((A B E)
+    (B E F)
+    (C B D)
+    (D)
+    (E C F)
+    (F D G)
+    (G)))
+
+;e473.
+
+;e474.
+;must use 2 functions for 2 recursion on list and neighbors
+
+;e475.
+(define (find-path/list* lo-Os D G)
+  (local ((define candidates (filter (lambda (can) (not (boolean? can)))
+                                     (map (lambda (o)
+                                            (local ((define candidate (find-path o D G)))
+                                              (cond [(boolean? candidate) #f]
+                                                    [else candidate]))) lo-Os))))
+    (if (empty? candidates) #f (first candidates))))
+
+;e476.
+(define-struct transition [current key next])
+(define-struct fsm [initial transitions final])
+ 
+; An FSM is a structure:
+;   (make-fsm FSM-State [List-of 1Transition] FSM-State)
+; A 1Transition is a structure:
+;   (make-transition FSM-State 1String FSM-State)
+; An FSM-State is String.
+ 
+; data example: see exercise 109
+ 
+(define fsm-a-bc*-d
+  (make-fsm
+   "AA"
+   (list (make-transition "AA" "a" "BC")
+         (make-transition "BC" "b" "BC")
+         (make-transition "BC" "c" "BC")
+         (make-transition "BC" "d" "DD"))
+   "DD"))
+
+; FSM String -> Boolean 
+; does an-fsm recognize the given string
+(define (fsm-match? an-fsm a-string)
+  (local ((define los (explode a-string)))
+    (cond [(empty? los) #f]
+          [else (local ((define current (first los))
+                        (define next (accept? an-fsm (fsm-initial an-fsm) current)))
+                  (cond [(boolean? next) #f]
+                        [(equal? next (fsm-final an-fsm)) (if (empty? (rest los)) #t #f)]
+                        [else (fsm-match? (make-fsm next
+                                                    (fsm-transitions an-fsm)
+                                                    (fsm-final an-fsm))
+                                          (implode (rest los)))]))])))
+(check-expect (fsm-match? fsm-a-bc*-d "abbd") #t)
+(check-expect (fsm-match? fsm-a-bc*-d "abbcc") #f)
+(check-expect (fsm-match? fsm-a-bc*-d "dabbcc") #f)
+(check-expect (fsm-match? fsm-a-bc*-d "abbdcc") #f)
+
+;FSM State 1String -> [Maybe State]
+(define (accept? fsm init s)
+  (local ((define match (filter (lambda (t) (and (equal? init (transition-current t))
+                                                 (equal? s (transition-key t))))
+                                (fsm-transitions fsm))))
+    (if (and (equal? init (fsm-initial fsm))
+             (cons? match))
+        (transition-next (first match))
+        #f)))
+(check-expect (accept? fsm-a-bc*-d "AA" "a") "BC")
+(check-expect (accept? fsm-a-bc*-d "BC" "a") #f)
+
+(define fsm-a-bc*-d-e*-f
+  (make-fsm
+   "AA"
+   (list (make-transition "AA" "a" "BC")
+         (make-transition "BC" "b" "BC")
+         (make-transition "BC" "c" "BC")
+         (make-transition "BC" "d" "DD")
+         (make-transition "DD" "e" "DD")
+         (make-transition "DD" "f" "FF"))
+   "FF"))
+(check-expect (fsm-match? fsm-a-bc*-d-e*-f "abbdcc") #f)
+(check-expect (fsm-match? fsm-a-bc*-d-e*-f "bbdcc") #f)
+(check-expect (fsm-match? fsm-a-bc*-d-e*-f "adf") #t)
+(check-expect (fsm-match? fsm-a-bc*-d-e*-f "abccbdeef") #t)
+
+;e477.
+; [List-of X] -> [List-of [List-of X]]
+; creates a list of all rearrangements of the items in w
+(define (arrangements w)
+  (cond
+    [(empty? w) '(())]
+    [else
+     (foldr (lambda (item others)
+              (local ((define without-item
+                        (arrangements (remove item w)))
+                      (define add-item-to-front
+                        (map (lambda (a) (cons item a))
+                             without-item)))
+                (append add-item-to-front others)))
+            '()
+            w)]))
+ 
+(define (all-words-from-rat? w)
+  (and (member (explode "rat") w)
+       (member (explode "art") w)
+       (member (explode "tar") w)))
+ 
+(check-satisfied (arrangements '("r" "a" "t"))
+                 all-words-from-rat?)
+
+;trivial case is '(), which produces '(())
+;to generate next problem, use (foldr) to pick one from w and (add-item-to-front) to the arrangements of the rest to create all arrangements
+;once create all of the arrangments, collect them into the '(others) list, continue on next pick in w
+
+;e478.
+;Two diagonals of a 2x3 square are 2 valid configuration, which can be placed in 3x3 chess board by 4 different types.
+
+;e479.
+(define QUEENS 8)
+; A QP is a structure:
+;   (make-posn CI CI)
+; A CI is an N in [0,QUEENS).
+; interpretation (make-posn r c) denotes the square at 
+; the r-th row and c-th column
+
+;QP QP -> Boolean
+(define (threatening? qp1 qp2)
+  (local ((define (test-row qp1 qp2)
+            (equal? (posn-y qp1) (posn-y qp2)))
+          (define (test-col qp1 qp2)
+            (equal? (posn-x qp1) (posn-x qp2)))
+          (define (test-diag qp1 qp2)
+            (equal? (abs (- (posn-x qp1) (posn-x qp2)))
+                    (abs (- (posn-y qp1) (posn-y qp2))))))
+    (or (test-row qp1 qp2)
+        (test-col qp1 qp2)
+        (test-diag qp1 qp2))))
+
+(check-expect (threatening? (make-posn 2 1) (make-posn 3 2)) #t)
+(check-expect (threatening? (make-posn 2 1) (make-posn 1 2)) #t)
+(check-expect (threatening? (make-posn 0 0) (make-posn 3 3)) #t)
+(check-expect (threatening? (make-posn 4 0) (make-posn 2 2)) #t)
+(check-expect (threatening? (make-posn 1 0) (make-posn 2 2)) #f)
+
+;e480.
+(define QUEEN (text "♛" 19 "blue"))
+(define GRID-SIZE 19)
+(define (board-size n)
+  (+ (* n (+ GRID-SIZE 1)) 1))
+(define (create-board n)
+  (foldr (lambda (i board)
+           (overlay/xy (rectangle (board-size n) 1 "solid" "black")
+                       0 (- 0 (* i (+ GRID-SIZE 1)))
+                       board))
+         (foldr (lambda (i board)
+                  (overlay/xy (rectangle 1 (board-size n) "solid" "black")
+                              (- 0 (* i (+ GRID-SIZE 1)))
+                              0 board))
+                (rectangle (board-size n) (board-size n) "outline" "black")
+                (build-list (- n 1) add1))
+         (build-list (- n 1) add1)))
+
+;N [List-of QP] Image -> Image
+(define (render-queens n lp image)
+  (local ((define (render-queen qp board)
+            (overlay/xy image
+                        (- (* -1 (posn-x qp) (+ GRID-SIZE 1)) 1)
+                        (- (* -1 (posn-y qp) (+ GRID-SIZE 1)) 1) board)))
+    (foldr (lambda (q board)
+             (render-queen q board)) (create-board n) lp)))
+
+;e481.
+;Number -> [[list-of QP] -> Boolean]
+(define (n-queens-solution? n)
+  (lambda (lqp)
+    (and (= (length lqp) n)
+         (not (threatening?* lqp)))))
+(check-satisfied 4QUEEN-SOLUTION-1 (n-queens-solution? 4))
+(check-satisfied 4QUEEN-SOLUTION-2 (n-queens-solution? 4))
+
+(define (threatening?* lqp)
+  (cond [(empty? lqp) #f]
+        [else (or (foldr (lambda (qp result)
+                           (threatening? (first lqp) qp)) #f (rest lqp))
+                  (threatening?* (rest lqp)))]))
+(check-expect (threatening?* 4QUEEN-SOLUTION-2) #f)
+
+(define 4QUEEN-SOLUTION-2
+  (list  (make-posn 0 2) (make-posn 1 0)
+         (make-posn 2 3) (make-posn 3 1)))
+(define 4QUEEN-SOLUTION-1
+  (list  (make-posn 1 0) (make-posn 3 1)
+         (make-posn 0 2) (make-posn 2 3)))
+
+;SET SET -> Boolean
+(define (set=? a b) #t)
+
+;e482+483.
+
+;1.trivial case:         place 0 queen on the board.
+;2.trivial result:       return the board as-is.
+;3.generate new problem: place n-th queen on the board, investigate all the 
+;                        next possible places for queen n, generates a problem
+;                        for each case, deal with the case, return a QP.
+;4.combine solutions:    add QP to the board.
+
+;N -> [List-of QP]
+;create all QPs of a nxn board
+(define (create-nxn n)
+  (foldr (lambda (ith board)
+           (append (foldr (lambda (jth row)
+                            (cons (make-posn ith jth) row))
+                          '() (build-list n +))
+                   board))
+         '() (build-list n +)))
+
+;I
+;a Board collects those positions where a queen can still be placed;
+;A Board is a list of QPs and size N
+;[[List-of QP] N] 
+(define-struct board-I [space size])
+; N -> Board 
+; creates the initial n by n board
+(define (board0-I n)
+  (make-board-I (create-nxn n) n))
+(check-expect (board0-I 2) (make-board-I (list
+                                          (make-posn 0 0)
+                                          (make-posn 0 1)
+                                          (make-posn 1 0)
+                                          (make-posn 1 1)) 2))
+ 
+; Board QP -> [Maybe Board]
+; places a queen at qp on a-board
+(define (add-queen-I a-board qp)
+  (make-board-I
+   (filter (lambda (open) (not (threatening? qp open))) (board-I-space a-board))
+   (board-I-size a-board)))
+(check-expect (add-queen-I (board0-I 2) (make-posn 0 1)) (make-board-I '() 2))
+(check-expect (add-queen-I (board0-I 0) (make-posn 0 1)) (make-board-I '() 0))
+(check-expect (add-queen-I (board0-I 3) (make-posn 0 0))
+              (make-board-I (list (make-posn 1 2) (make-posn 2 1)) 3))
+ 
+; Board -> [List-of QP]
+; finds spots where it is still safe to place a queen
+(define (find-open-spots-I a-board)
+  (board-I-space a-board))
+(check-expect (find-open-spots-I (board0-I 2)) (create-nxn 2))
+(check-expect (find-open-spots-I (board0-I 0)) '())
+
+; Board N -> [Maybe [List-of QP]]
+; places n queens on board; otherwise, returns #false
+(define (place-queens-I a-board n)
+  (cond [(= n 0) (board-I-space a-board)]
+        [else (local ((define next-spot (find-open-spots-I a-board)))
+                (cond [(empty? next-spot) #f]
+                      [else (local ((define candidate (investigate-I next-spot a-board n)))
+                              (if (boolean? candidate) #f
+                                  candidate))]))]))
+;[List-of QP] Board N -> [Maybe [List-of QP]]
+;gives the n-th queen solution, QP or #false if no solution
+(define (investigate-I spots board n)
+  (local ((define queens
+            (filter cons?
+                    (map (lambda (spot)
+                           (place-queens-I (add-queen-I board spot) (sub1 n))) spots))))
+    (if (empty? queens) #f (first queens))))
+
+(define (n-queens-I n)
+  (render-queens n (place-queens-I (board0-I n) n) QUEEN))
+;NOT WORKING
+
+;II.
+;a Board contains the list of positions where a queen has been placed;
+;A Board is a list of QPs and size N
+;[[List-of QP] N]
+(define-struct board-II [queens size])
+
+; N -> Board 
+; creates the initial n by n board
+(define (board0-II n)
+  (make-board-II '() n))
+ 
+; Board QP -> Board
+; places a queen at qp on a-board
+(define (add-queen-II a-board qp)
+  (make-board-II (cons qp (board-II-queens a-board)) (board-II-size a-board)))
+(check-expect (add-queen-II (make-board-II '() 2) (make-posn 0 1))
+              (make-board-II (list (make-posn 0 1)) 2))
+(check-expect (add-queen-II (make-board-II (list (make-posn 0 2)) 3) (make-posn 0 1))
+              (make-board-II (list (make-posn 0 1) (make-posn 0 2)) 3))
+ 
+; Board Number -> [List-of QP]
+; finds spots where it is still safe to place a queen
+(define (find-open-spots-II a-board)
+  (foldr (lambda (q result)
+           (filter (lambda (qp) (not (threatening? q qp))) result))
+         (create-nxn (board-II-size a-board)) (board-II-queens a-board)))
+(check-expect (find-open-spots-II (board0-II 2))
+              (create-nxn 2))
+(check-expect (find-open-spots-II (make-board-II (list (make-posn 0 0)) 2))
+              '())
+(check-expect (find-open-spots-II (make-board-II (list (make-posn 0 0)) 3))
+              (list (make-posn 1 2) (make-posn 2 1)))
+
+; Board N -> [Maybe [List-of QP]]
+; places n queens on board; otherwise, returns #false
+(define (place-queens-II a-board n)
+  (cond [(= n 0) (board-II-queens a-board)]
+        [else (local ((define next-spot (find-open-spots-II a-board)))
+                (cond [(empty? next-spot) #f]
+                      [else (local ((define candidate (investigate-II next-spot a-board n)))
+                              (if (boolean? candidate) #f
+                                  candidate))]))]))
+;[List-of QP] Board N -> [Maybe [List-of QP]]
+;gives the n-th queen solution, QP or #false if no solution
+(define (investigate-II spots board n)
+  (local ((define queens
+            (filter cons?
+                    (map (lambda (spot)
+                           (place-queens-II (add-queen-II board spot) (sub1 n))) spots))))
+    (if (empty? queens) #f (first queens))))
+
+(define (n-queens-II n)
+  (render-queens n (place-queens-II (board0-II n) n) QUEEN))
+
+;III.
+;a Board is a grid of n by n squares, each possibly occupied by a queen. Use a structure with three fields to represent a square: one for x, one for y, and a third one saying whether the square is threatened.
+;Square is a structure with
+(define-struct SQ [x y threatened])
+;A Board is a list of squares
+;[List-of Square]
